@@ -1,0 +1,11 @@
+{
+  "click_interval_enter": 0.4,
+  "load_time_before_game": 15.1,
+  "game_duration": 83.0,
+  "load_time_after_game": 8.0,
+  "click_interval_return": 0.5,
+  "click_interval_in_game": 0.1687,
+  "click_jitter": 5.0,
+  "time_jitter": 0.0015,
+  "max_loops": 0.0
+}
