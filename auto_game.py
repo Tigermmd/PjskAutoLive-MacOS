@@ -78,8 +78,8 @@ class RhythmGameBot:
             if "enter_steps" not in data:
                 raise KeyError("缺少 'enter_steps'")
             self.enter_steps = [tuple(pos) for pos in data["enter_steps"]]
-            if len(self.enter_steps) != 7:
-                raise ValueError(f"enter_steps 应为7个点，实际有 {len(self.enter_steps)} 个")
+            if len(self.enter_steps) != 11:
+                raise ValueError(f"enter_steps 应为11个点，实际有 {len(self.enter_steps)} 个")
 
             if "track_left" not in data or "track_right" not in data:
                 raise KeyError("缺少 'track_left' 或 'track_right'")
@@ -345,7 +345,7 @@ class RhythmGameBot:
                     break
 
                 # 进入休息
-                self.update_status("⏸️ 正在休息 (15分钟)", "blue")
+                self.update_status("⏸️ 正在休息", "red")
                 rest_end = time.time() + REST_DURATION
                 while self.running and time.time() < rest_end:
                     time.sleep(1)
@@ -394,7 +394,7 @@ class RhythmGameBot:
 
             self.update_status(f"🔚 第 {self.loop_count} 轮: 返回主菜单")
             time.sleep(self.config["load_time_after_game"])
-            for _ in range(10):
+            for _ in range(12):
                 if not self.running:
                     return
                 self.safe_click(self.return_pos)

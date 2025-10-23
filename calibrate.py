@@ -8,18 +8,22 @@ import time
 from pynput import mouse
 import os
 
-# 要采集的 10 个点击点（按顺序）
+# 要采集的 14 个点击点（按顺序）
 POINTS = [
-    "1. 主界面 - '演出' 按钮",
-    "2. 选择单人演出",
-    "3. 选择左侧歌单",
-    "4. 选择🦐",
-    "5. 选择easy难度",
-    "6. 确定",
-    "7. 点击 '开始演奏'",
-    "8. 游戏内 - 最左边轨道点击位置",
-    "9. 游戏内 - 最右边轨道点击位置",
-    "10. 结算界面 - '返回主菜单' 按钮（将连续点5次）"
+    "1. 登陆界面进入游戏",
+    "2. 登陆错误是确认位置（1的右边一些）",
+    "3. 干掉公告(如果没有弹出公告，请使用get_position.py手动确认后修改json内enter_steps的最后一项)",
+    "4. 右上角菜单",
+    "5. 返回主页面",
+    "6. 开始演出",
+    "7. 左上角返回",
+    "8. 同6，开始演出",
+    "9. 单人Live",
+    "10. 确认",
+    "11. 开始演奏",
+    "12. 游戏内 - 最左边轨道点击位置",
+    "13. 游戏内 - 最右边轨道点击位置",
+    "14. 结算界面 - '返回主菜单' 按钮（将连续点10次）"
 ]
 
 
@@ -49,13 +53,13 @@ class Calibrator:
 
         desc = tk.Label(
             self.root,
-            text="请按顺序在游戏内点击以下 10 个位置",
-            fg="blue",
+            text="请按顺序在游戏内点击以下 14 个位置,推荐先登陆把当日登陆内容点掉，然后返回标题界面后开始",
+            fg="red",
             font=("Arial", 10)
         )
         desc.pack(pady=5)
 
-        # 列表框显示10个点
+        # 列表框显示14个点
         frame = tk.Frame(self.root)
         frame.pack(pady=10, fill="both", expand=True)
 
@@ -86,7 +90,7 @@ class Calibrator:
 
         self.btn_start = ttk.Button(
             btn_frame,
-            text="🔴 开始录制接下来的10次点击",
+            text="🔴 开始录制接下来的14次点击",
             command=self.start_listening,
             width=30
         )
@@ -104,7 +108,7 @@ class Calibrator:
             return  # 只记录左键按下
 
         if self.current_count >= len(POINTS):
-            return  # 仅记录10次
+            return  # 仅记录14次
 
         # 记录点击
         self.current_count += 1
@@ -124,8 +128,8 @@ class Calibrator:
                 fg="orange"
             )
         else:
-            # === 第10次点击完成 → 自动保存 ===
-            self.status.config(text="🎉 全部10个点已记录，正在保存...", fg="blue")
+            # === 第14次点击完成 → 自动保存 ===
+            self.status.config(text="🎉 全部14个点已记录，正在保存...", fg="blue")
             self.btn_start.config(state="disabled")
             self.save_positions()
             if self.listener:
@@ -144,13 +148,13 @@ class Calibrator:
 
     def start_listening(self):
         if self.current_count >= len(POINTS):
-            messagebox.showinfo("提示", "✅ 已记录全部10个点！")
+            messagebox.showinfo("提示", "✅ 已记录全部14个点！")
             return
 
         # 确认开始
         confirm = messagebox.askokcancel(
             "🎮 准备开始录制",
-            "即将开始录制接下来的 10 次鼠标左键点击。\n\n"
+            "即将开始录制接下来的 14 次鼠标左键点击。\n\n"
             "请做好准备：\n"
             "1. 点击【确定】\n"
             "2. 快速切换到游戏窗口\n"
@@ -172,11 +176,16 @@ class Calibrator:
 
     def save_positions(self):
         """保存坐标到 positions.json"""
+        # 把登陆步骤放到进入歌曲后面，防止在主界面误触
+        tmp_pos = self.positions[:11]
+        game_pos = self.positions[11:]
+        starts = tmp_pos[3:] + tmp_pos[:3] 
+        self.positions = starts + game_pos
         structured = {
-            "enter_steps": self.positions[:7],
-            "track_left":  self.positions[7],
-            "track_right": self.positions[8],
-            "return_pos":  self.positions[9],
+            "enter_steps": self.positions[:11],
+            "track_left":  self.positions[11],
+            "track_right": self.positions[12],
+            "return_pos":  self.positions[13],
             "_note": "自动生成: rhythm game calibrator",
             "_timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
         }
@@ -209,16 +218,16 @@ class Calibrator:
     def on_closing(self):
         """关闭窗口时处理未保存数据"""
         if 0 < len(self.positions) < len(POINTS):
-            if messagebox.askyesno("⚠️ 未完成记录", "已记录部分坐标但未完成10次点击。\n是否保存当前数据？"):
+            if messagebox.askyesno("⚠️ 未完成记录", "已记录部分坐标但未完成14次点击。\n是否保存当前数据？"):
                 self.save_positions()
         elif len(self.positions) == len(POINTS):
-            if messagebox.askyesno("💾 保存坐标", "已记录全部10个点，是否保存？"):
+            if messagebox.askyesno("💾 保存坐标", "已记录全部14个点，是否保存？"):
                 self.save_positions()
         self.root.destroy()
 
     def run(self):
         """启动 GUI"""
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        # self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.mainloop()
 
 
