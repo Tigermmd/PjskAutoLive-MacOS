@@ -13,7 +13,7 @@ import os
 pyautogui.PAUSE = 0  # ⚠️ 必须设置为 0，否则每次操作自动 sleep 0.1 秒！
 pyautogui.FAILSAFE = True
 
-# 默认参数
+# 默认参数（含新增随机范围）
 DEFAULT_CONFIG = {
     "click_interval_enter": 0.7,
     "load_time_before_game": 15.0,
@@ -24,6 +24,14 @@ DEFAULT_CONFIG = {
     "click_jitter": 2,               # 推荐 2 像素扰动，更自然
     "time_jitter": 0.005,
     "max_loops": 10,
+
+    # === 新增：随机时间范围 ===
+    "work_duration_min": 10 * 60,   # 最少工作 10 分钟（秒）
+    "work_duration_max": 20 * 60,   # 最多工作 20 分钟（秒）
+    "rest_duration_min": 30,        # 最少休息 30 秒
+    "rest_duration_max": 180,       # 最多休息 180 秒
+    "post_cycle_delay_min": 2,    # 每轮后最小延迟（秒）
+    "post_cycle_delay_max": 15,    # 每轮后最大延迟（秒）
 }
 
 CONFIG_FILE = "config.json"
@@ -35,14 +43,12 @@ CUSTOM_TIPS = """
 把鼠标移出屏幕外可中断
 """
 
-WORK_DURATION = 30 * 60   # 工作时间：210 分钟 → 秒
-REST_DURATION = 1 * 60    # 休息时间：15 分钟 → 秒
-
 
 class RhythmGameBot:
     def __init__(self):
         self.running = False
         self.start_time = None
+        self.current_work_end_time = None  # 动态工作周期结束时间
         self.loop_count = 0
         self.enter_steps = []
         self.game_tracks = []
@@ -107,7 +113,7 @@ class RhythmGameBot:
     def setup_gui(self):
         self.root = tk.Tk()
         self.root.title("🎵 节奏游戏自动化 - 终极版")
-        self.root.geometry("400x700")
+        self.root.geometry("420x820")
         self.root.resizable(False, False)
         self.root.configure(bg="#1e1e1e")
 
@@ -148,6 +154,14 @@ class RhythmGameBot:
             ("click_jitter", "🎮 点击坐标扰动 (±像素)"),
             ("time_jitter", "🎮 时间扰动范围 (±秒)"),
             ("max_loops", "⏹️ 最大循环次数 (0=无限)"),
+
+            # === 新增参数 ===
+            ("work_duration_min", "🕒 工作时长最小值 (秒)"),
+            ("work_duration_max", "🕒 工作时长最大值 (秒)"),
+            ("rest_duration_min", "🛌 休息时长最小值 (秒)"),
+            ("rest_duration_max", "🛌 休息时长最大值 (秒)"),
+            ("post_cycle_delay_min", "⏳ 轮次间最小延迟 (秒)"),
+            ("post_cycle_delay_max", "⏳ 轮次间最大延迟 (秒)"),
         ]
 
         for i, (key, desc) in enumerate(params):
@@ -247,7 +261,7 @@ class RhythmGameBot:
 
         tk.Label(
             self.root,
-            text="© rhythm bot v2.0",
+            text="© rhythm bot v2.1 (随机增强版)",
             font=("Arial", 8),
             fg="#666",
             bg="#1e1e1e"
@@ -289,6 +303,7 @@ class RhythmGameBot:
         self.running = True
         self.loop_count = 0
         self.start_time = time.time()
+        self.current_work_end_time = self.start_time + self.get_current_work_duration()  # ✅ 设置首次工作结束时间
 
         self.countdown(3)
 
@@ -316,10 +331,25 @@ class RhythmGameBot:
         self.info_text.insert("end", text)
         self.info_text.config(state="disabled")
 
+    # === 新增：随机时间生成方法 ===
+    def get_current_work_duration(self):
+        min_sec = self.config["work_duration_min"]
+        max_sec = self.config["work_duration_max"]
+        return random.uniform(min_sec, max_sec)
+
+    def get_current_rest_duration(self):
+        min_sec = self.config["rest_duration_min"]
+        max_sec = self.config["rest_duration_max"]
+        return random.uniform(min_sec, max_sec)
+
+    def get_post_cycle_delay(self):
+        min_sec = self.config["post_cycle_delay_min"]
+        max_sec = self.config["post_cycle_delay_max"]
+        return random.uniform(min_sec, max_sec)
+
     def should_take_rest(self):
-        """判断是否应该进入休息（仅在本轮结束后）"""
-        elapsed = time.time() - self.start_time
-        return elapsed >= WORK_DURATION
+        """判断是否应该进入休息（基于当前工作周期结束时间）"""
+        return time.time() >= self.current_work_end_time
 
     def check_max_loops(self):
         max_loops = int(self.config["max_loops"])
@@ -339,22 +369,30 @@ class RhythmGameBot:
 
             # 检查是否需要休息（但先完成本轮）
             if self.should_take_rest():
-                self.update_status("😴 准备休息：完成当前轮后将休息15分钟", "blue")
-                self.run_single_cycle()  # 执行完当前轮
+                self.update_status("😴 准备休息：完成当前轮后将休息", "blue")
+                self.run_single_cycle()
                 if not self.running:
                     break
 
-                # 进入休息
-                self.update_status("⏸️ 正在休息", "red")
-                rest_end = time.time() + REST_DURATION
+                # 执行随机休息
+                rest_duration = self.get_current_rest_duration()
+                self.update_status(f"⏸️ 正在休息 ({int(rest_duration)} 秒)", "red")
+                rest_end = time.time() + rest_duration
                 while self.running and time.time() < rest_end:
                     time.sleep(1)
-                # 休息结束，重置开始时间，进入下一个工作周期
+
+                # 休息结束，重置新的工作周期
                 self.start_time = time.time()
+                self.current_work_end_time = self.start_time + self.get_current_work_duration()
                 continue
 
             # 正常执行一轮
             self.run_single_cycle()
+
+            # ✅ 每轮结束后加随机延迟
+            if self.running:
+                delay = self.get_post_cycle_delay()
+                time.sleep(delay)
 
         self.stop()
 
@@ -364,8 +402,8 @@ class RhythmGameBot:
             return
 
         self.loop_count += 1
-        info = f"🔄 第 {self.loop_count} 轮\n"
-        info += f"⏱️  已运行: {int((time.time()-self.start_time)//60)} 分钟"
+        elapsed_min = int((time.time() - self.start_time) // 60)
+        info = f"🔄 第 {self.loop_count} 轮\n⏱️  已运行: {elapsed_min} 分钟"
         self.update_info(info)
 
         try:
@@ -405,7 +443,6 @@ class RhythmGameBot:
         except Exception as e:
             print(f"❌ 第 {self.loop_count} 轮出错: {e}")
             time.sleep(5)
-
 
     def run(self):
         self.root.mainloop()
